@@ -155,6 +155,11 @@ func adjustNodes(n map[string]any) {
 		if attrs, ok := n["attributes"].([]any); ok && len(attrs) == 0 {
 			delete(n, "attributes")
 		}
+	case typ == "ImportExpression":
+		// espree's latest resolves to ecmaVersion 15, so acorn's >=16
+		// `options` field on ImportExpression is never emitted by real
+		// espree. Strip it (acorn-go, being true "latest", adds options:null).
+		delete(n, "options")
 	case typ == "Literal" && n["bigint"] == nil:
 		// acorn-go stores a BigInt literal as value:raw-as-string ("123n").
 		// acorn 8.x exposes value (the bigint) plus a separate bigint field

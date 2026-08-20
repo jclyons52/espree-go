@@ -33,9 +33,7 @@ var sourceCorpus = []string{
 	"const n = a?.b?.[c]?.(d) ?? fallback;",
 	"class C { static s = 1; #priv = 2; get x() { return 1; } set x(v) {} static async m() {} }",
 	"const { a, ...restObj } = obj; function f(...args) { return args; }",
-	// NOTE: dynamic import('mod') / import.meta is a KNOWN acorn-go gap
-	// (module-only parser doesn't emit CallExpression for `import()` yet);
-	// espree-go inherits it. Excluded from corpus until acorn-go adds it.
+	"const m = import('mod'); const ns = import.meta.url;",
 	"async function loop() { for await (const x of asyncIter) { use(x); } }",
 	"const tagged = tag`a${1}b${2}c`;",
 	"label: { break label; }",
