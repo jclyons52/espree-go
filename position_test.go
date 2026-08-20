@@ -43,7 +43,7 @@ func runRealEspreeFull(t *testing.T, src string) (string, string, string) {
 	esprDir := filepath.Join("original", "node_modules", "espree")
 	driver := `const espree=require(process.env.ESPR_ORIG);
 try{ const ast=espree.parse(process.argv[1],{sourceType:'module',ecmaVersion:'latest',tokens:true,comment:true});
- process.stdout.write(JSON.stringify(ast)); }
+ process.stdout.write(JSON.stringify(ast,(k,v)=>typeof v==='bigint'?v.toString():v)); }
 catch(e){ process.stdout.write('ERR:'+e.message); }`
 	abs, _ := filepath.Abs(esprDir)
 	cmd := exec.Command(nodeBin, "-e", driver, src)
@@ -142,7 +142,7 @@ func runRealEspreeTokenize(t *testing.T, src string) string {
 	esprDir := filepath.Join("original", "node_modules", "espree")
 	driver := `const espree=require(process.env.ESPR_ORIG);
 try{ const toks=espree.tokenize(process.argv[1],{sourceType:'module',ecmaVersion:'latest'});
- process.stdout.write(JSON.stringify(toks)); }
+ process.stdout.write(JSON.stringify(toks,(k,v)=>typeof v==='bigint'?v.toString():v)); }
 catch(e){ process.stdout.write('ERR:'+e.message); }`
 	abs, _ := filepath.Abs(esprDir)
 	cmd := exec.Command(nodeBin, "-e", driver, src)

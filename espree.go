@@ -155,6 +155,15 @@ func adjustNodes(n map[string]any) {
 		if attrs, ok := n["attributes"].([]any); ok && len(attrs) == 0 {
 			delete(n, "attributes")
 		}
+	case typ == "Literal" && n["bigint"] == nil:
+		// acorn-go stores a BigInt literal as value:raw-as-string ("123n").
+		// acorn 8.x exposes value (the bigint) plus a separate bigint field
+		// (the digit string). Normalize to match: bigint=digits, value=digits.
+		if raw, ok := n["raw"].(string); ok && strings.HasSuffix(raw, "n") {
+			digits := strings.TrimSuffix(raw, "n")
+			n["bigint"] = digits
+			n["value"] = digits
+		}
 	case strings.HasPrefix(typ, "Function"):
 		if g, ok := n["generator"].(bool); !ok || !g {
 			n["generator"] = false

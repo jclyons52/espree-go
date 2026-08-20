@@ -92,6 +92,11 @@ func translateToken(tok acorn.Token, code string) map[string]any {
 		t["type"] = "String"
 	case label == "regexp":
 		t["type"] = "RegularExpression"
+		// espree adds token.regex = {pattern, flags}; derive from the raw
+		// "/pattern/flags" (acorn-go doesn't yet expose them separately).
+		if pat, flags, ok := splitRegex(raw); ok {
+			t["regex"] = map[string]any{"pattern": pat, "flags": flags}
+		}
 	case keywordValue(label):
 		switch label {
 		case "true", "false":
@@ -108,9 +113,37 @@ func translateToken(tok acorn.Token, code string) map[string]any {
 	// For a regexp the value is "/pattern/flags"; we approximate with the raw
 	// source (acorn-go doesn't yet expose pattern/flags separately).
 	t["value"] = raw
+	// espree strips the leading '#' from PrivateIdentifier values (acorn's
+	// privateId token.value is the bare name; acorn-go keeps the raw "#name").
+	if label == "privateId" && len(raw) > 0 && raw[0] == '#' {
+		t["value"] = raw[1:]
+	}
 	t["start"] = float64(tok.Start)
 	t["end"] = float64(tok.End)
 	return t
+}
+
+// splitRegex splits a regex literal raw ("/pattern/flags") into pattern and
+// flags by finding the last unescaped '/'. Escaped '/' (\\) inside the pattern
+// are skipped so "/a\/b/g" yields pattern "a\\/b", flags "g".
+func splitRegex(raw string) (pattern, flags string, ok bool) {
+	if len(raw) < 3 || raw[0] != '/' {
+		return "", "", false
+	}
+	last := -1
+	for i := 1; i < len(raw); i++ {
+		if raw[i] == '\\' {
+			i++ // skip escaped char
+			continue
+		}
+		if raw[i] == '/' {
+			last = i
+		}
+	}
+	if last < 0 {
+		return "", "", false
+	}
+	return raw[1:last], raw[last+1:], true
 }
 
 // punctuatorLabel reports whether a token label is a punctuator in espree's

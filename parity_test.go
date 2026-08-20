@@ -26,6 +26,20 @@ var sourceCorpus = []string{
 	"const { x, y: [z] } = obj; const [a, ...rest] = arr;",
 	"outer: for (;;) { break outer; }",
 	"switch (v) { case 1: a(); break; default: b(); }",
+	// modern constructs beyond the basic set
+	"async function load() { const r = await fetch('/x'); return r.json(); }",
+	"async () => { await g(); }",
+	"function* gen() { yield 1; yield* inner(); return 2; }",
+	"const n = a?.b?.[c]?.(d) ?? fallback;",
+	"class C { static s = 1; #priv = 2; get x() { return 1; } set x(v) {} static async m() {} }",
+	"const { a, ...restObj } = obj; function f(...args) { return args; }",
+	// NOTE: dynamic import('mod') / import.meta is a KNOWN acorn-go gap
+	// (module-only parser doesn't emit CallExpression for `import()` yet);
+	// espree-go inherits it. Excluded from corpus until acorn-go adds it.
+	"async function loop() { for await (const x of asyncIter) { use(x); } }",
+	"const tagged = tag`a${1}b${2}c`;",
+	"label: { break label; }",
+	"const big = 123n; const re = /ab+c/giu;",
 }
 
 func runRealEspree(t *testing.T, src string) string {
@@ -39,7 +53,7 @@ func runRealEspree(t *testing.T, src string) string {
 		t.Fatalf("vendored espree missing: %v", err)
 	}
 	driver := `const espree=require(process.env.ESPR_ORIG);
-try{ const ast=espree.parse(process.argv[1],{sourceType:'module',ecmaVersion:'latest'}); process.stdout.write(JSON.stringify(ast)); }
+try{ const ast=espree.parse(process.argv[1],{sourceType:'module',ecmaVersion:'latest'}); process.stdout.write(JSON.stringify(ast,(k,v)=>typeof v==='bigint'?v.toString():v)); }
 catch(e){ process.stdout.write('ERR:'+e.message); }`
 	abs, _ := filepath.Abs(esprDir)
 	argv := []string{"-e", driver, src}
