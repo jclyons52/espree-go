@@ -105,6 +105,22 @@ func ParseJSON(code string, opts *Options) (string, error) {
 	return string(b), nil
 }
 
+// Tokenize is the Go analogue of espree.tokenize(code, opts): it lexes the
+// input and returns the esprima-style token list (via the same translator as
+// Parse's tokens), without building an AST. Matches espree.tokenize's array.
+func Tokenize(code string, opts *Options) ([]any, error) {
+	_, _, tokens, err := acorn.ParseAll(code)
+	if err != nil {
+		return nil, err
+	}
+	out := convertTokens(tokens, code)
+	res := make([]any, len(out))
+	for i, t := range out {
+		res[i] = t
+	}
+	return res, nil
+}
+
 // convertComments maps acorn-go comments to espree's esprima-style comment
 // nodes ({type, value, start, end}).
 func convertComments(cs []acorn.Comment) []map[string]any {

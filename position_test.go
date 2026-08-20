@@ -135,3 +135,48 @@ func firstDiff(t *testing.T, a, b any, path string) {
 		t.Errorf("  [%s]: go=%v js=%v", path, a, b)
 	}
 }
+
+func runRealEspreeTokenize(t *testing.T, src string) string {
+	t.Helper()
+	nodeBin, _ := exec.LookPath("node")
+	esprDir := filepath.Join("original", "node_modules", "espree")
+	driver := `const espree=require(process.env.ESPR_ORIG);
+try{ const toks=espree.tokenize(process.argv[1],{sourceType:'module',ecmaVersion:'latest'});
+ process.stdout.write(JSON.stringify(toks)); }
+catch(e){ process.stdout.write('ERR:'+e.message); }`
+	abs, _ := filepath.Abs(esprDir)
+	cmd := exec.Command(nodeBin, "-e", driver, src)
+	cmd.Env = append(os.Environ(), "ESPR_ORIG="+abs)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("node failed: %v\n%s", err, out)
+	}
+	return string(out)
+}
+
+func TestTokenizeParity(t *testing.T) {
+	if _, err := exec.LookPath("node"); err != nil {
+		t.Skip("node not available")
+	}
+	for _, src := range sourceCorpus {
+		js := runRealEspreeTokenize(t, src)
+		if len(js) >= 4 && js[:4] == "ERR:" {
+			t.Errorf("real espree.tokenize failed on %q: %s", src, js)
+			continue
+		}
+		goToks, err := Tokenize(src, &Options{SourceType: "module"})
+		if err != nil {
+			t.Errorf("go tokenize failed %q: %v", src, err)
+			continue
+		}
+		goJSON, _ := json.Marshal(goToks)
+		var jt, gt any
+		json.Unmarshal([]byte(js), &jt)
+		json.Unmarshal(goJSON, &gt)
+		if !reflect.DeepEqual(gt, jt) {
+			t.Errorf("TOKENIZE mismatch for %q\n go=%s\n js=%s", src, goJSON, js)
+			continue
+		}
+		t.Logf("OK (tokenize) %q", src)
+	}
+}
