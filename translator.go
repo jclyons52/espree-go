@@ -60,13 +60,13 @@ func convertTokens(tokens []acorn.Token, code string) []map[string]any {
 
 // templatePart converts a buffered template token group into one Template
 // token whose value spans from the first token's start to the last's end.
+// Matches espree with range:false: template tokens carry type+value only
+// (start/end are only added when range:true, which we don't emit yet).
 func templatePart(buf []acorn.Token, code string) map[string]any {
 	first, last := buf[0], buf[len(buf)-1]
 	return map[string]any{
 		"type":  "Template",
 		"value": code[first.Start:last.End],
-		"start": float64(first.Start),
-		"end":   float64(last.End),
 	}
 }
 
