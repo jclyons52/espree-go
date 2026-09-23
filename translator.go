@@ -7,8 +7,8 @@ import (
 // convertTokens translates acorn-go's raw tokens into espree's esprima-style
 // tokens for program.tokens (token-translator.js). Only emits the subset
 // needed for non-JSX code; regex values are approximated as the raw source.
-func convertTokens(tokens []acorn.Token, code string) []map[string]any {
-	var out []map[string]any
+func convertTokens(tokens []acorn.Token, code string, withRange, withLoc bool) []map[string]any {
+	out := []map[string]any{}
 	var curly *acorn.Token
 	var buf []acorn.Token
 
@@ -29,12 +29,12 @@ func convertTokens(tokens []acorn.Token, code string) []map[string]any {
 			}
 			buf = append(buf, tk)
 			if len(buf) > 1 {
-				out = append(out, templatePart(buf, code))
+				out = append(out, templatePart(buf, code, withRange, withLoc))
 				buf = nil
 			}
 		case "${":
 			buf = append(buf, tk)
-			out = append(out, templatePart(buf, code))
+			out = append(out, templatePart(buf, code, withRange, withLoc))
 			buf = nil
 		case "}":
 			if curly != nil {
@@ -60,14 +60,27 @@ func convertTokens(tokens []acorn.Token, code string) []map[string]any {
 
 // templatePart converts a buffered template token group into one Template
 // token whose value spans from the first token's start to the last's end.
-// Matches espree with range:false: template tokens carry type+value only
-// (start/end are only added when range:true, which we don't emit yet).
-func templatePart(buf []acorn.Token, code string) map[string]any {
+//
+// espree's token translator only attaches positions to a Template token when
+// the corresponding option is on (convertTemplatePart: loc comes from
+// `firstToken.loc`, start/end/range from `firstToken.range`), so a bare
+// tokenize() call emits type+value only. ESLint always parses with both on.
+func templatePart(buf []acorn.Token, code string, withRange, withLoc bool) map[string]any {
 	first, last := buf[0], buf[len(buf)-1]
-	return map[string]any{
+	t := map[string]any{
 		"type":  "Template",
 		"value": code[first.Start:last.End],
 	}
+	if withLoc {
+		li := newLineIndex(code)
+		t["loc"] = li.locOf(first.Start, last.End)
+	}
+	if withRange {
+		t["start"] = float64(first.Start)
+		t["end"] = float64(last.End)
+		t["range"] = []any{float64(first.Start), float64(last.End)}
+	}
+	return t
 }
 
 // translateToken maps one raw acorn-go token to an esprima token.

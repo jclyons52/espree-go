@@ -34,6 +34,8 @@ type state struct {
 	originalSourceType string
 	comment            bool
 	tokens             bool
+	rangeAllowed       bool
+	locAllowed         bool
 }
 
 func normalize(opts *Options) *state {
@@ -48,6 +50,8 @@ func normalize(opts *Options) *state {
 	}
 	s.comment = opts.Comment
 	s.tokens = opts.Tokens
+	s.rangeAllowed = opts.Range
+	s.locAllowed = opts.Loc
 	return s
 }
 
@@ -72,6 +76,10 @@ func Parse(code string, opts *Options) (interface{}, error) {
 	}
 	prog["sourceType"] = st.originalSourceType
 
+	// Program bounds, Esprima-compatible (espree.js):
+	//   start = first body node's start (leading whitespace/comments excluded)
+	//   end   = last real (non-EOF) token's end (trailing whitespace excluded)
+	// acorn instead starts programs at 0 and counts trailing whitespace.
 	body, _ := prog["body"].([]any)
 	if len(body) > 0 {
 		if first, ok := body[0].(map[string]any); ok {
@@ -79,16 +87,24 @@ func Parse(code string, opts *Options) (interface{}, error) {
 				prog["start"] = s
 			}
 		}
+	} else {
+		prog["start"] = float64(0)
+	}
+	if end, ok := lastTokenEnd(tokens); ok {
+		prog["end"] = end
 	}
 
 	if st.comment {
 		prog["comments"] = convertComments(comments)
 	}
 	if st.tokens {
-		prog["tokens"] = convertTokens(tokens, code)
+		prog["tokens"] = convertTokens(tokens, code, st.rangeAllowed, st.locAllowed)
 	}
 
 	adjustNodes(prog)
+	// loc/range emission runs last: espree reports locations for the adjusted
+	// offsets (Program bounds, TemplateElement backticks).
+	applyLocRange(prog, code, opts != nil && opts.Loc, opts != nil && opts.Range)
 	return prog, nil
 }
 
@@ -109,16 +125,29 @@ func ParseJSON(code string, opts *Options) (string, error) {
 // input and returns the esprima-style token list (via the same translator as
 // Parse's tokens), without building an AST. Matches espree.tokenize's array.
 func Tokenize(code string, opts *Options) ([]any, error) {
+	st := normalize(opts)
 	_, _, tokens, err := acorn.ParseAll(code)
 	if err != nil {
 		return nil, err
 	}
-	out := convertTokens(tokens, code)
+	out := convertTokens(tokens, code, st.rangeAllowed, st.locAllowed)
 	res := make([]any, len(out))
 	for i, t := range out {
 		res[i] = t
 	}
 	return res, nil
+}
+
+// lastTokenEnd returns the end offset of the last non-EOF acorn token, which
+// is what espree's state.lastToken tracks (and uses to close the Program).
+func lastTokenEnd(tokens []acorn.Token) (float64, bool) {
+	for i := len(tokens) - 1; i >= 0; i-- {
+		if tokens[i].Label == "eof" {
+			continue
+		}
+		return float64(tokens[i].End), true
+	}
+	return 0, false
 }
 
 // convertComments maps acorn-go comments to espree's esprima-style comment
