@@ -36,10 +36,8 @@ func dropRangeLoc(v any) any {
 
 func runRealEspreeFull(t *testing.T, src string) (string, string, string) {
 	t.Helper()
-	nodeBin, err := exec.LookPath("node")
-	if err != nil {
-		t.Skip("node not available")
-	}
+	requireOracle(t)
+	nodeBin := "node"
 	esprDir := filepath.Join("original", "node_modules", "espree")
 	driver := `const espree=require(process.env.ESPR_ORIG);
 try{ const ast=espree.parse(process.argv[1],{sourceType:'module',ecmaVersion:'latest',tokens:true,comment:true});
@@ -64,9 +62,7 @@ catch(e){ process.stdout.write('ERR:'+e.message); }`
 }
 
 func TestPositionFidelity(t *testing.T) {
-	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node not available")
-	}
+	requireOracle(t)
 	for _, src := range sourceCorpus {
 		js, jsToks, _ := runRealEspreeFull(t, src)
 		goJSON, err := ParseJSON(src, &Options{SourceType: "module", Tokens: true, Comment: true})
@@ -138,7 +134,8 @@ func firstDiff(t *testing.T, a, b any, path string) {
 
 func runRealEspreeTokenize(t *testing.T, src string) string {
 	t.Helper()
-	nodeBin, _ := exec.LookPath("node")
+	requireOracle(t)
+	nodeBin := "node"
 	esprDir := filepath.Join("original", "node_modules", "espree")
 	driver := `const espree=require(process.env.ESPR_ORIG);
 try{ const toks=espree.tokenize(process.argv[1],{sourceType:'module',ecmaVersion:'latest'});
@@ -155,9 +152,7 @@ catch(e){ process.stdout.write('ERR:'+e.message); }`
 }
 
 func TestTokenizeParity(t *testing.T) {
-	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node not available")
-	}
+	requireOracle(t)
 	for _, src := range sourceCorpus {
 		js := runRealEspreeTokenize(t, src)
 		if len(js) >= 4 && js[:4] == "ERR:" {

@@ -42,14 +42,9 @@ var sourceCorpus = []string{
 
 func runRealEspree(t *testing.T, src string) string {
 	t.Helper()
-	nodeBin, err := exec.LookPath("node")
-	if err != nil {
-		t.Skip("node not available")
-	}
+	requireOracle(t)
+	nodeBin := "node"
 	esprDir := filepath.Join("original", "node_modules", "espree")
-	if _, err := os.Stat(esprDir); err != nil {
-		t.Fatalf("vendored espree missing: %v", err)
-	}
 	driver := `const espree=require(process.env.ESPR_ORIG);
 try{ const ast=espree.parse(process.argv[1],{sourceType:'module',ecmaVersion:'latest'}); process.stdout.write(JSON.stringify(ast,(k,v)=>typeof v==='bigint'?v.toString():v)); }
 catch(e){ process.stdout.write('ERR:'+e.message); }`
@@ -90,9 +85,7 @@ func stripPos(v any) any {
 }
 
 func TestParseParity(t *testing.T) {
-	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node not available; skipping espree parity")
-	}
+	requireOracle(t)
 	for _, src := range sourceCorpus {
 		js := runRealEspree(t, src)
 		if len(js) >= 4 && js[:4] == "ERR:" {
@@ -122,9 +115,7 @@ func TestParseParity(t *testing.T) {
 
 func TestParseCommentOption(t *testing.T) {
 	src := "// lead\nlet a = 1; /* block */\n"
-	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node not available")
-	}
+	requireOracle(t)
 	js := runRealEspreeComment(t, src)
 	goJSON, err := ParseJSON(src, &Options{SourceType: "module", Comment: true})
 	if err != nil {

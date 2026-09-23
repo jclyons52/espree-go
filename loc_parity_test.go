@@ -41,13 +41,8 @@ var locRangeCorpus = []string{
 // (loc+range+comment+tokens) — the "full" option set ESLint always uses.
 func runRealEspreeLocated(t *testing.T, src string) string {
 	t.Helper()
-	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node not available")
-	}
+	requireOracle(t)
 	esprDir := filepath.Join("original", "node_modules", "espree")
-	if _, err := os.Stat(esprDir); err != nil {
-		t.Fatalf("vendored espree missing: %v", err)
-	}
 	driver := `const espree=require(process.env.ESPR_ORIG);
 try{
   const ast=espree.parse(process.argv[1],{sourceType:'module',ecmaVersion:'latest',loc:true,range:true,comment:true,tokens:true});
@@ -66,9 +61,7 @@ try{
 // TestLocRangeParity compares the FULL espree output — positions included —
 // between espree-go and real espree for the loc+range+comment+tokens option set.
 func TestLocRangeParity(t *testing.T) {
-	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node not available; skipping espree loc/range parity")
-	}
+	requireOracle(t)
 	checked := 0
 	for _, src := range locRangeCorpus {
 		js := runRealEspreeLocated(t, src)

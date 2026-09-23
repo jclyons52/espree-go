@@ -53,13 +53,8 @@ var knownParserGaps = []struct {
 // "message|line|column" string, or "OK" when it parses.
 func runRealEspreeError(t *testing.T, src string) string {
 	t.Helper()
-	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node not available")
-	}
+	requireOracle(t)
 	esprDir := filepath.Join("original", "node_modules", "espree")
-	if _, err := os.Stat(esprDir); err != nil {
-		t.Fatalf("vendored espree missing: %v", err)
-	}
 	driver := `const espree=require(process.env.ESPR_ORIG);
 try{
   espree.parse(process.argv[1],{sourceType:'module',ecmaVersion:'latest',loc:true,range:true});
@@ -80,9 +75,7 @@ try{
 // TestParseErrorParity checks that espree-go reports the same parse-error
 // message/line/column as real espree.
 func TestParseErrorParity(t *testing.T) {
-	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node not available; skipping parse-error parity")
-	}
+	requireOracle(t)
 	checked := 0
 	for _, src := range errorCorpus {
 		want := runRealEspreeError(t, src)
