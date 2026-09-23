@@ -1,3 +1,9 @@
+This Go package is a port of the npm package espree (espree 9.6.1).
+It is a derivative work, so the original licence below governs
+the ported code (the Go translation is by Joseph Lyons).
+
+------------------------------------------------------------------------
+
 BSD 2-Clause License
 
 Copyright (c) Open JS Foundation
