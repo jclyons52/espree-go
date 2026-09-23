@@ -31,22 +31,23 @@ var errorCorpus = []string{
 	"a b c",
 	"const { a: } = obj;",
 	"do {} while ()",
+	"function f(a, a) { 'use strict'; }",
+	"function f(a, a) {}",
+	"var arguments = 1; 'use strict';",
 }
 
 // knownParserGaps are inputs where espree-go's underlying parser (acorn-go) is
-// known to differ from acorn/esppree: they are reported for visibility but not
+// known to differ from acorn/espree: they are reported for visibility but not
 // asserted, so the gap is visible in the test log rather than hidden by
 // omission. Closing each one is a parser-side (acorn-go) task.
+//
+// Currently empty: the strict-mode duplicate-parameter check
+// ("Argument name clash") used to be listed here and is now implemented, so
+// that input moved into errorCorpus above.
 var knownParserGaps = []struct {
 	src  string
 	note string
-}{
-	{
-		"function f(a, a) { 'use strict'; }",
-		"acorn-go does not implement acorn's strict-mode duplicate-parameter check " +
-			"(\"Argument name clash\"): the function is parsed where espree rejects it",
-	},
-}
+}{}
 
 // runRealEspreeError parses with real espree and returns a canonical
 // "message|line|column" string, or "OK" when it parses.

@@ -32,19 +32,23 @@ type Options struct {
 
 type state struct {
 	originalSourceType string
-	comment            bool
-	tokens             bool
-	rangeAllowed       bool
-	locAllowed         bool
+	// acornSourceType is what the parser is told: espree maps its
+	// "commonjs" sourceType onto acorn's "script".
+	acornSourceType string
+	comment         bool
+	tokens          bool
+	rangeAllowed    bool
+	locAllowed      bool
 }
 
 func normalize(opts *Options) *state {
-	s := &state{originalSourceType: "module"}
+	s := &state{originalSourceType: "module", acornSourceType: "module"}
 	if opts == nil {
 		return s
 	}
 	if opts.SourceType == "script" || opts.SourceType == "commonjs" {
-		s.originalSourceType = opts.SourceType // reported, though we parse as module
+		s.originalSourceType = opts.SourceType
+		s.acornSourceType = "script"
 	} else {
 		s.originalSourceType = "module"
 	}
@@ -60,7 +64,7 @@ func normalize(opts *Options) *state {
 // tokens are attached only when the Tokens option is set (see translator).
 func Parse(code string, opts *Options) (interface{}, error) {
 	st := normalize(opts)
-	base, comments, tokens, err := acorn.ParseAll(code)
+	base, comments, tokens, err := acorn.ParseAllWithOptions(code, acorn.ParseOptions{SourceType: st.acornSourceType})
 	if err != nil {
 		// espree reports Esprima-style errors: message without the position
 		// suffix, 1-based line, 1-based column.
@@ -128,7 +132,7 @@ func ParseJSON(code string, opts *Options) (string, error) {
 // Parse's tokens), without building an AST. Matches espree.tokenize's array.
 func Tokenize(code string, opts *Options) ([]any, error) {
 	st := normalize(opts)
-	_, _, tokens, err := acorn.ParseAll(code)
+	_, _, tokens, err := acorn.ParseAllWithOptions(code, acorn.ParseOptions{SourceType: st.acornSourceType})
 	if err != nil {
 		return nil, err
 	}
