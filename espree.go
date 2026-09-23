@@ -62,7 +62,9 @@ func Parse(code string, opts *Options) (interface{}, error) {
 	st := normalize(opts)
 	base, comments, tokens, err := acorn.ParseAll(code)
 	if err != nil {
-		return nil, err
+		// espree reports Esprima-style errors: message without the position
+		// suffix, 1-based line, 1-based column.
+		return nil, NormalizeError(err, code)
 	}
 	// acorn-go's AST is an internal node struct; express it as the JSON shape
 	// espree consumers expect.

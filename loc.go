@@ -14,6 +14,7 @@ package espree
 
 // lineIndex maps byte offsets to 1-based lines / 0-based columns.
 type lineIndex struct {
+	text   string
 	starts []int // starts[i] = byte offset where 0-based line i begins
 }
 
@@ -38,7 +39,7 @@ func newLineIndex(code string) *lineIndex {
 			starts = append(starts, i+1)
 		}
 	}
-	return &lineIndex{starts: starts}
+	return &lineIndex{text: code, starts: starts}
 }
 
 // pos converts a byte offset into espree's {line, column} object.
@@ -60,6 +61,25 @@ func (li *lineIndex) pos(off int) map[string]any {
 		"line":   float64(lo + 1),
 		"column": float64(off - li.starts[lo]),
 	}
+}
+
+// Index converts a 1-based line and 0-based column back to a byte offset,
+// clamped into the text (the inverse of pos()).
+func (li *lineIndex) Index(line, col int) int {
+	if line < 1 {
+		line = 1
+	}
+	if line > len(li.starts) {
+		line = len(li.starts)
+	}
+	idx := li.starts[line-1] + col
+	if idx < 0 {
+		return 0
+	}
+	if idx > len(li.text) {
+		return len(li.text)
+	}
+	return idx
 }
 
 // locOf builds the {start,end} location object for an offset pair.
