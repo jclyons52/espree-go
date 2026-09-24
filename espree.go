@@ -28,6 +28,10 @@ type Options struct {
 	Loc         bool
 	Comment     bool
 	Tokens      bool
+	// EcmaFeatures mirrors espree's options.ecmaFeatures. Only globalReturn is
+	// honoured: espree maps it (and sourceType "commonjs") onto acorn's
+	// allowReturnOutsideFunction, which is what `env: node` sets.
+	EcmaFeatures map[string]any
 }
 
 type state struct {
@@ -39,6 +43,9 @@ type state struct {
 	tokens          bool
 	rangeAllowed    bool
 	locAllowed      bool
+	// allowReturnOutsideFunction is espree's:
+	//   sourceType === "commonjs" || Boolean(ecmaFeatures.globalReturn)
+	allowReturnOutsideFunction bool
 }
 
 func normalize(opts *Options) *state {
@@ -56,6 +63,10 @@ func normalize(opts *Options) *state {
 	s.tokens = opts.Tokens
 	s.rangeAllowed = opts.Range
 	s.locAllowed = opts.Loc
+	// espree: allowReturnOutsideFunction = sourceType === "commonjs" ||
+	// Boolean(ecmaFeatures.globalReturn)
+	globalReturn, _ := opts.EcmaFeatures["globalReturn"].(bool)
+	s.allowReturnOutsideFunction = s.originalSourceType == "commonjs" || globalReturn
 	return s
 }
 
@@ -64,7 +75,7 @@ func normalize(opts *Options) *state {
 // tokens are attached only when the Tokens option is set (see translator).
 func Parse(code string, opts *Options) (interface{}, error) {
 	st := normalize(opts)
-	base, comments, tokens, err := acorn.ParseAllWithOptions(code, acorn.ParseOptions{SourceType: st.acornSourceType})
+	base, comments, tokens, err := acorn.ParseAllWithOptions(code, acorn.ParseOptions{SourceType: st.acornSourceType, AllowReturnOutsideFunction: st.allowReturnOutsideFunction})
 	if err != nil {
 		// espree reports Esprima-style errors: message without the position
 		// suffix, 1-based line, 1-based column.
@@ -101,7 +112,7 @@ func Parse(code string, opts *Options) (interface{}, error) {
 	}
 
 	if st.comment {
-		prog["comments"] = convertComments(comments)
+		prog["comments"] = convertComments(comments, code)
 	}
 	if st.tokens {
 		prog["tokens"] = convertTokens(tokens, code, st.rangeAllowed, st.locAllowed)
@@ -132,7 +143,7 @@ func ParseJSON(code string, opts *Options) (string, error) {
 // Parse's tokens), without building an AST. Matches espree.tokenize's array.
 func Tokenize(code string, opts *Options) ([]any, error) {
 	st := normalize(opts)
-	_, _, tokens, err := acorn.ParseAllWithOptions(code, acorn.ParseOptions{SourceType: st.acornSourceType})
+	_, _, tokens, err := acorn.ParseAllWithOptions(code, acorn.ParseOptions{SourceType: st.acornSourceType, AllowReturnOutsideFunction: st.allowReturnOutsideFunction})
 	if err != nil {
 		return nil, err
 	}
@@ -157,14 +168,17 @@ func lastTokenEnd(tokens []acorn.Token) (float64, bool) {
 }
 
 // convertComments maps acorn-go comments to espree's esprima-style comment
-// nodes ({type, value, start, end}).
-func convertComments(cs []acorn.Comment) []map[string]any {
+// nodes ({type, value, start, end}). The type is decided from the SOURCE at the
+// comment's start offset, as upstream does (code.slice(start, start + 2) === "#!"),
+// not from the comment text: acorn's hashbang comment text excludes the leading
+// "#!" — checking the text makes the Hashbang branch dead code.
+func convertComments(cs []acorn.Comment, code string) []map[string]any {
 	out := make([]map[string]any, 0, len(cs))
 	for _, c := range cs {
 		typ := "Line"
 		if c.Block {
 			typ = "Block"
-		} else if strings.HasPrefix(c.Text, "#!") {
+		} else if c.Start+2 <= len(code) && code[c.Start:c.Start+2] == "#!" {
 			typ = "Hashbang"
 		}
 		out = append(out, map[string]any{
